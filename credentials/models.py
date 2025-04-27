@@ -7,6 +7,8 @@ from django.contrib.auth.models import AbstractUser
 class Vault_User(models.Model):
     username = models.CharField(max_length=14, primary_key=True)
     password = models.CharField(max_length=30)
+    user_first_name = models.CharField(max_length=30, default="")
+    user_last_name = models.CharField(max_length=30, default="")
 
     is_superuser = models.BooleanField()
 
