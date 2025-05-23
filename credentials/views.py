@@ -2,10 +2,11 @@ from django.shortcuts import render
 
 # Create your views here.
 import json
+import psycopg
 from django.http import HttpResponse
 from django.template import loader
 from django.views.decorators.csrf import csrf_protect
-from .forms import SignUpForm, LoginForm
+from .forms import SignUpForm
 
 
 
@@ -38,22 +39,33 @@ def signup(request):
 def postsignup(request):
     if request.method == "POST":
         # Access form data using request.POST
-        first_name = request.POST.get('first_name')
-        last_name = request.POST.get('last_name')
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        password_repeat = request.POST.get('password_repeat')
+        form = SignUpForm(request.POST)
+        print(form.errors)
+
+        if form.is_valid():
+            print("Form is valid")
+            # first_name = request.POST.get('first_name')
+            # last_name = request.POST.get('last_name')
+            # username = request.POST.get('username')
+            # password = request.POST.get('password')
+            # password_repeat = request.POST.get('password_repeat')
+
+            user = form.save()  # Save the user data
+        else:
+            return HttpResponse("Invalid form input")
+
 
         # Debugging: Print the form data
         # print(f"First Name: {first_name}, Last Name: {last_name}, Username: {username}")
         # print(f"Password: {password}, Password Repeat: {password_repeat}")
 
         # Add your logic here (e.g., save to database, validate passwords, etc.)
-        context = {
-            'first_name': first_name,
-            'last_name': last_name,
-            'username': username,
-        }
+        # context = {
+        #     'first_name': first_name,
+        #     'last_name': last_name,
+        #     'username': username,
+        # }
+        context = {}
         template = loader.get_template("templates/postsignup.html")
         return HttpResponse(template.render(context, request))
     else:
