@@ -23,10 +23,29 @@ def index(request):
 
 
 def login(request):
-    template = loader.get_template("templates/login.html")
-    context = {}
-    
-    return HttpResponse(template.render(context, request))
+    if request.method == "POST":
+        username = request.POST.get('uname')
+        password = request.POST.get('psw')
+        print(f"Username: {username}, Password: {password}")
+        from .models import Vault_User
+        try:
+            user = Vault_User.objects.get(username=username)
+            if user.check_password(password):
+                # Successful login
+                template = loader.get_template("templates/myvault.html")
+                context = {'user_name': user.user_first_name}
+                return HttpResponse(template.render(context, request))
+            else:
+                error = "Invalid username or password."
+        except Vault_User.DoesNotExist:
+            error = "Invalid username or password."
+        template = loader.get_template("templates/login.html")
+        context = {'error': error}
+        return HttpResponse(template.render(context, request))
+    else:
+        template = loader.get_template("templates/login.html")
+        context = {}
+        return HttpResponse(template.render(context, request))
 
 
 def signup(request):
@@ -70,3 +89,12 @@ def postsignup(request):
         return HttpResponse(template.render(context, request))
     else:
         return HttpResponse("Invalid request method")
+    
+
+def myvault(request):
+    template = loader.get_template("templates/myvault.html")
+    context = {
+         'user_name': 'Brijesh',
+    }
+    
+    return HttpResponse(template.render(context, request))
