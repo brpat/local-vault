@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 # Create your views here.
 import json
@@ -7,7 +7,6 @@ from django.http import HttpResponse
 from django.template import loader
 from django.views.decorators.csrf import csrf_protect
 from .forms import SignUpForm
-
 
 
 def base(request):
@@ -26,15 +25,14 @@ def login(request):
     if request.method == "POST":
         username = request.POST.get('uname')
         password = request.POST.get('psw')
-        print(f"Username: {username}, Password: {password}")
         from .models import Vault_User
         try:
             user = Vault_User.objects.get(username=username)
             if user.check_password(password):
-                # Successful login
+                # Save username in session for authentication
+                request.session['username'] = user.username
                 template = loader.get_template("templates/myvault.html")
-                context = {'user_name': user.user_first_name}
-                return HttpResponse(template.render(context, request))
+                return redirect('myvault')
             else:
                 error = "Invalid username or password."
         except Vault_User.DoesNotExist:
@@ -63,11 +61,6 @@ def postsignup(request):
 
         if form.is_valid():
             print("Form is valid")
-            # first_name = request.POST.get('first_name')
-            # last_name = request.POST.get('last_name')
-            # username = request.POST.get('username')
-            # password = request.POST.get('password')
-            # password_repeat = request.POST.get('password_repeat')
 
             user = form.save()  # Save the user data
         else:
@@ -89,12 +82,73 @@ def postsignup(request):
         return HttpResponse(template.render(context, request))
     else:
         return HttpResponse("Invalid request method")
-    
+
+@csrf_protect
+def add_credential(request):
+    if request.method == "POST":
+        cred_name = request.POST.get('cred_name')
+        cred_website = request.POST.get('cred_website')
+        cred_username = request.POST.get('cred_username')
+        cred_password = request.POST.get('cred_password')
+        cred_notes = request.POST.get('cred_notes')
+
+        # Assume user is authenticated and username is in session
+        username = request.session.get('username')
+        if not username:
+            return HttpResponse("User not authenticated", status=401)
+
+        from django.db import connection
+        table_name = f"credential_{username}"
+        create_table_sql = f'''
+        CREATE TABLE IF NOT EXISTS "{table_name}" (
+            name TEXT PRIMARY KEY,
+            website TEXT,
+            username TEXT,
+            password TEXT,
+            notes TEXT
+        );
+        '''
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(create_table_sql)
+                cursor.execute(
+                    f"INSERT INTO \"{table_name}\" (name, website, username, password, notes) VALUES (%s, %s, %s, %s, %s)",
+                    [cred_name, cred_website, cred_username, cred_password, cred_notes]
+                )
+            connection.commit()  # Explicitly commit the transaction
+            return HttpResponse("Credential added successfully!")
+        except Exception as e:
+            return HttpResponse(f"Error adding credential: {str(e)}", status=500)
 
 def myvault(request):
+    username = request.session.get('username', '')
+    print(f"Username from session: {username}")
+    credentials = []
+    if username:
+        from django.db import connection
+        table_name = f"credential_{username}"
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(f'SELECT name, website, username, password, notes FROM "{table_name}"')
+                rows = cursor.fetchall()
+                for row in rows:
+                    credentials.append({
+                        'name': row[0],
+                        'website': row[1],
+                        'username': row[2],
+                        'password': row[3],
+                        'notes': row[4],
+                    })
+                    print(row)
+        except Exception:
+            pass  # Table may not exist yet, or no credentials
     template = loader.get_template("templates/myvault.html")
     context = {
-         'user_name': 'Brijesh',
+         'user_name': username,
+         'credentials': credentials,
     }
-    
     return HttpResponse(template.render(context, request))
+
+def logout(request):
+    request.session.flush()  # Clear all session data
+    return redirect('login')
